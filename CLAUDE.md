@@ -17,10 +17,11 @@ Don't wire in Postgres until asked.
 - `db.py`: the **only** place data comes from. Functions return dicts shaped like the PostgreSQL rows
   (column names from `schema.sql`); each has a `TODO(db)` comment with its query. DB integration = rewrite these bodies.
   Users are stored in an in-memory list for now.
-- `schema.sql`: planned tables `users` (email unique case-insensitive), `items` (`type` movie/book/music, creator,
-  Also `bookmarks` (user, item) and `review_reactions` (review, user, value 1/-1). In memory, item ratings = seed baseline blended with user reviews.
-  year, genre, description, color1/color2 poster gradient, featured), `reviews` (1–5 rating + optional body,
-  one per user per item). Ratings/averages are computed from `reviews`, never stored.
+- `schema.sql`: full PostgreSQL schema + demo seed (re-runnable). Core tables db.py uses: `users` (email unique case-insensitive, `role`),
+  `items` (`type` movie/book/music, creator, year, description, color1/color2 poster gradient, `cover_url`, one `featured`),
+  `reviews` (1–5 rating + optional body, one per user per item), `bookmarks`, `review_reactions` (1/-1).
+  Ratings/averages are computed from `reviews`, never stored. In memory, item ratings = seed baseline blended with user reviews.
+  Items no longer have a `genre` column; it comes from the `item_cards` view. Also adds genres (`item_genres`, position 1 = card genre), `movie/book/album_details` (type-locked via FK on `items(id, type)`), `tracks`, `people`/`credits`, review `contains_spoilers`/comments/reports, bookmark `status`, `lists`, `follows`, `recommendation_dismissals`, `items.search` tsvector. Views `item_cards` (the "<item select>": rating, counts, Bayesian `score`, NULL until rated), `item_stats`, `review_details`. Functions `recommend_items(user, limit, type)` and `similar_items(item, limit)`. Same item ids as db.py. Re-runnable; checked on PostgreSQL 16 (PGlite).
 - `templates/`: `base.html`, `_nav.html` (shared header), `_macros.html` (`poster`, `card`), `index.html`, `browse.html`, `item.html`, `bookmarks.html`, `signup.html`, `login.html`. Jinja autoescapes all data.
 - Passwords: Werkzeug `generate_password_hash` / `check_password_hash` in `app.py`; `db.py` only stores the hash.
 - Auth: Flask signed-cookie session, `session["user"] = {id, name}` set by `log_in()` (clears session first).

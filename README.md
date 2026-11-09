@@ -19,7 +19,7 @@ Open <http://localhost:5500>.
 | --- | --- |
 | `app.py` | Flask routes: `/` (home), `/signup`, `/login`, `POST /logout` |
 | `db.py` | Data layer. Returns mock data now; each function has a `TODO(db)` with its PostgreSQL query |
-| `schema.sql` | Planned PostgreSQL tables (`users`, `items`, `reviews`) |
+| `schema.sql` | PostgreSQL schema + demo data: catalogue, reviews, bookmarks, lists, follows, search, recommendation functions |
 | `templates/` | Jinja templates: `base.html`, `index.html`, `signup.html`, `login.html` |
 | `static/style.css` | All styles |
 | `test_app.py` | Self-check: `python test_app.py` prints `ok` |
@@ -35,7 +35,7 @@ Open <http://localhost:5500>.
 ## Connecting PostgreSQL later
 
 1. `pip install "psycopg[binary]"` and add it to `requirements.txt`
-2. Create the database and run `schema.sql`
+2. Create the database and run `schema.sql` (commands at the top of the file)
 3. Replace each function body in `db.py` with the query in its `TODO(db)` comment.
    The return shapes already match, so `app.py` and the templates don't change.
 
