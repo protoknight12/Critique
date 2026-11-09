@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_macros.html" import card %}
+
+{% block title %}Bookmarks{% endblock %}
+
+{% block body %}
+    {% include "_nav.html" %}
+
+    <main class="home">
+        <section class="row">
+            <div class="row-head">
+                <h1 class="page-title">Your bookmarks</h1>
+            </div>
+            {% if items %}
+            <div class="cards">
+                {% for item in items %}{{ card(item) }}{% endfor %}
+            </div>
+            {% else %}
+            <p class="empty">Nothing saved yet. Use “Bookmark” on any movie, book or album and it will show up here.</p>
+            {% endif %}
+        </section>
+
+        <footer>
+            <p>© 2026 Critique</p>
+        </footer>
+    </main>
+{% endblock %}

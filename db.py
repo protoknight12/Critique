@@ -3,6 +3,7 @@
 Every function returns what its PostgreSQL query will return (dicts with schema.sql column
 names), so wiring in the database only changes this file. Each TODO(db) shows the query.
 """
+from datetime import datetime
 
 ITEMS = [
     {"id": 1, "type": "movie", "title": "Dune: Part Two", "creator": "Denis Villeneuve", "year": 2024, "genre": "Sci-Fi",
@@ -40,14 +41,22 @@ ITEMS = [
      "color1": "#b58a3f", "color2": "#2a1d08", "rating": 4.5, "rating_count": 39000},
 ]
 
+# user_id None = seeded demo review (no account). Ratings in ITEMS are the seed baseline;
+# reviews added by users are blended in by _with_stats().
 REVIEWS = [
-    {"name": "Maya K.", "title": "Past Lives", "type": "movie", "rating": 5,
+    {"id": 1, "user_id": None, "name": "Maya K.", "item_id": 3, "rating": 5, "created_at": datetime(2026, 10, 2),
      "body": "Quiet, aching and devastatingly honest. The final walk to the taxi says more than any monologue could."},
-    {"name": "Jonah R.", "title": "Piranesi", "type": "book", "rating": 4,
+    {"id": 2, "user_id": None, "name": "Jonah R.", "item_id": 9, "rating": 4, "created_at": datetime(2026, 10, 9),
      "body": "A strange, gentle labyrinth of a novel. Slow at first, then impossible to put down."},
-    {"name": "Sofia L.", "title": "In Rainbows", "type": "music", "rating": 5,
+    {"id": 3, "user_id": None, "name": "Sofia L.", "item_id": 14, "rating": 5, "created_at": datetime(2026, 10, 16),
      "body": 'Seventeen years later and "Reckoner" still sounds like it came from the future.'},
 ]
+_next_review_id = 4
+
+# review_id -> {user_id: 1 (like) | -1 (dislike)}
+_reactions = {}
+# (user_id, item_id) -> time bookmarked
+_bookmarks = {}
 
 # ponytail: in-memory until PostgreSQL is wired in; signups are lost on restart.
 _users = []
@@ -57,23 +66,136 @@ _users = []
 #   FROM items i LEFT JOIN reviews r ON r.item_id = i.id ... GROUP BY i.id
 
 
+def _with_stats(item):
+    """Copy of item with rating/rating_count blended from the seed baseline + user reviews."""
+    mine = [r["rating"] for r in REVIEWS if r["item_id"] == item["id"] and r["user_id"] is not None]
+    count = item["rating_count"] + len(mine)
+    rating = (item["rating"] * item["rating_count"] + sum(mine)) / count
+    return {**item, "rating": round(rating, 1), "rating_count": count}
+
+
 def get_featured():
     # TODO(db): <item select> WHERE i.featured GROUP BY i.id LIMIT 1
-    return next((item for item in ITEMS if item.get("featured")), None)
+    return next((_with_stats(item) for item in ITEMS if item.get("featured")), None)
+
+
+def get_item(item_id):
+    # TODO(db): <item select> WHERE i.id = %s GROUP BY i.id
+    item = next((item for item in ITEMS if item["id"] == item_id), None)
+    return _with_stats(item) if item else None
+
+
+def list_items(item_type, sort="rating"):
+    """All items of a type. sort: rating | year | title."""
+    # TODO(db): <item select> WHERE i.type = %s GROUP BY i.id ORDER BY <sort>
+    items = [_with_stats(item) for item in ITEMS if item["type"] == item_type]
+    if sort == "year":
+        return sorted(items, key=lambda i: i["year"], reverse=True)
+    if sort == "title":
+        return sorted(items, key=lambda i: i["title"].lower())
+    return sorted(items, key=lambda i: (i["rating"], i["rating_count"]), reverse=True)
 
 
 def get_top_rated(item_type, limit=5):
-    # TODO(db): <item select> WHERE i.type = %s GROUP BY i.id
-    #           ORDER BY rating DESC NULLS LAST, rating_count DESC LIMIT %s
-    items = [item for item in ITEMS if item["type"] == item_type]
-    return sorted(items, key=lambda item: item["rating"], reverse=True)[:limit]
+    return list_items(item_type)[:limit]
+
+
+def _review_row(review, user_id=None):
+    """Review plus like/dislike counts and the viewing user's own reaction."""
+    reactions = _reactions.get(review["id"], {})
+    return {
+        **review,
+        "likes": sum(1 for v in reactions.values() if v == 1),
+        "dislikes": sum(1 for v in reactions.values() if v == -1),
+        "my_reaction": reactions.get(user_id) if user_id else None,
+    }
 
 
 def get_latest_reviews(limit=3):
-    # TODO(db): SELECT r.rating, r.body, r.created_at, u.name, i.title, i.type
+    # TODO(db): SELECT r.id, r.rating, r.body, r.created_at, u.name, i.id AS item_id, i.title, i.type
     #           FROM reviews r JOIN users u ON u.id = r.user_id JOIN items i ON i.id = r.item_id
     #           WHERE r.body IS NOT NULL ORDER BY r.created_at DESC LIMIT %s
-    return REVIEWS[:limit]
+    rows = sorted((r for r in REVIEWS if r["body"]), key=lambda r: r["created_at"], reverse=True)[:limit]
+    return [{**r, "title": get_item(r["item_id"])["title"], "type": get_item(r["item_id"])["type"]} for r in rows]
+
+
+def get_item_reviews(item_id, user_id=None):
+    """Written reviews for an item, newest first, with reaction counts."""
+    # TODO(db): SELECT r.*, u.name,
+    #             COUNT(*) FILTER (WHERE x.value = 1) AS likes, COUNT(*) FILTER (WHERE x.value = -1) AS dislikes,
+    #             MAX(x.value) FILTER (WHERE x.user_id = %s) AS my_reaction
+    #           FROM reviews r JOIN users u ON u.id = r.user_id
+    #           LEFT JOIN review_reactions x ON x.review_id = r.id
+    #           WHERE r.item_id = %s AND r.body IS NOT NULL GROUP BY r.id, u.name ORDER BY r.created_at DESC
+    rows = [r for r in REVIEWS if r["item_id"] == item_id and r["body"]]
+    return [_review_row(r, user_id) for r in sorted(rows, key=lambda r: r["created_at"], reverse=True)]
+
+
+def get_user_review(user_id, item_id):
+    # TODO(db): SELECT * FROM reviews WHERE user_id = %s AND item_id = %s
+    return next((r for r in REVIEWS if r["user_id"] == user_id and r["item_id"] == item_id), None)
+
+
+def get_review(review_id):
+    # TODO(db): SELECT * FROM reviews WHERE id = %s
+    return next((r for r in REVIEWS if r["id"] == review_id), None)
+
+
+def save_review(user_id, user_name, item_id, rating, body):
+    """Create or replace the user's review of an item (one per user per item). body may be None."""
+    # TODO(db): INSERT INTO reviews (user_id, item_id, rating, body) VALUES (%s, %s, %s, %s)
+    #           ON CONFLICT (user_id, item_id) DO UPDATE SET rating = EXCLUDED.rating, body = EXCLUDED.body
+    global _next_review_id
+    existing = get_user_review(user_id, item_id)
+    if existing:
+        existing.update(rating=rating, body=body, name=user_name)
+        return existing
+    review = {"id": _next_review_id, "user_id": user_id, "name": user_name, "item_id": item_id,
+              "rating": rating, "body": body, "created_at": datetime.now()}
+    _next_review_id += 1
+    REVIEWS.append(review)
+    return review
+
+
+def delete_review(review_id):
+    # TODO(db): DELETE FROM reviews WHERE id = %s   (review_reactions cascade)
+    REVIEWS[:] = [r for r in REVIEWS if r["id"] != review_id]
+    _reactions.pop(review_id, None)
+
+
+def react_to_review(review_id, user_id, value):
+    """value is 1 (like) or -1 (dislike). Repeating the same value removes the reaction."""
+    # TODO(db): same value already stored: DELETE FROM review_reactions WHERE review_id = %s AND user_id = %s
+    #           otherwise INSERT ... ON CONFLICT (review_id, user_id) DO UPDATE SET value = EXCLUDED.value
+    reactions = _reactions.setdefault(review_id, {})
+    if reactions.get(user_id) == value:
+        del reactions[user_id]
+    else:
+        reactions[user_id] = value
+
+
+def is_bookmarked(user_id, item_id):
+    # TODO(db): SELECT EXISTS (SELECT 1 FROM bookmarks WHERE user_id = %s AND item_id = %s)
+    return (user_id, item_id) in _bookmarks
+
+
+def toggle_bookmark(user_id, item_id):
+    """Returns True if the item is now bookmarked."""
+    # TODO(db): DELETE FROM bookmarks WHERE user_id = %s AND item_id = %s RETURNING 1;
+    #           if nothing was deleted: INSERT INTO bookmarks (user_id, item_id) VALUES (%s, %s)
+    if (user_id, item_id) in _bookmarks:
+        del _bookmarks[(user_id, item_id)]
+        return False
+    _bookmarks[(user_id, item_id)] = datetime.now()
+    return True
+
+
+def get_bookmarks(user_id):
+    """The user's bookmarked items, most recently added first."""
+    # TODO(db): <item select> JOIN bookmarks b ON b.item_id = i.id WHERE b.user_id = %s
+    #           GROUP BY i.id, b.created_at ORDER BY b.created_at DESC
+    keys = sorted((k for k in _bookmarks if k[0] == user_id), key=_bookmarks.get, reverse=True)
+    return [get_item(item_id) for _, item_id in keys]
 
 
 def get_user_by_email(email):

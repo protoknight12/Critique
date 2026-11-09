@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% from "_macros.html" import poster %}
+
+{% block title %}{{ item.title }}{% endblock %}
+
+{% block body %}
+    {% include "_nav.html" %}
+
+    <main class="home">
+        <section class="hero">
+            {{ poster(item, "hero-poster" ~ (" square" if item.type == "music" else "")) }}
+
+            <div>
+                <span class="kicker">{{ TYPE_LABELS[item.type] }}</span>
+                <h1>{{ item.title }}</h1>
+                <p class="meta">{{ item.year }} · {{ item.genre }} · {{ item.creator }}</p>
+                {% if item.description %}<p class="description">{{ item.description }}</p>{% endif %}
+
+                <div class="hero-rating">
+                    <span class="score">{{ item.rating }}</span>
+                    <span class="stars" aria-label="{{ item.rating }} out of 5 stars">{{ item.rating | stars }}</span>
+                    <span>{{ item.rating_count | compact }} ratings</span>
+                </div>
+
+                <div class="hero-actions">
+                    <a href="#write-review" class="button">{{ "Edit your review" if my_review else "Write a review" }}</a>
+                    <form action="{{ url_for('bookmark', item_id=item.id) }}" method="post">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <button type="submit" class="button ghost" aria-pressed="{{ 'true' if bookmarked else 'false' }}">
+                            {{ "Bookmarked ✓" if bookmarked else "Bookmark" }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <section class="row" id="reviews">
+            <div class="row-head">
+                <h2>Reviews <span class="count">{{ reviews | length }}</span></h2>
+            </div>
+
+            <div class="review-layout">
+                <div id="write-review" class="review-form">
+                    {% if session.user %}
+                    <h3>{{ "Your review" if my_review else "Write a review" }}</h3>
+                    <form action="{{ url_for('write_review', item_id=item.id) }}" method="post">
+                        <fieldset class="rating-input">
+                            <legend>Your rating</legend>
+                            {% for n in range(1, 6) %}
+                            <label>
+                                <input type="radio" name="rating" value="{{ n }}" required
+                                    {% if my_review and my_review.rating == n %}checked{% endif %}>
+                                {{ n }}
+                            </label>
+                            {% endfor %}
+                        </fieldset>
+                        <div class="form-group">
+                            <label for="body">Review <span class="optional">(optional)</span></label>
+                            <textarea id="body" name="body" rows="5" maxlength="{{ max_length }}"
+                                placeholder="What did you think?">{{ my_review.body if my_review and my_review.body }}</textarea>
+                        </div>
+                        <button type="submit" class="button small">{{ "Update review" if my_review else "Post review" }}</button>
+                    </form>
+                    {% if my_review %}
+                    <form action="{{ url_for('delete_review', review_id=my_review.id) }}" method="post" class="inline-form">
+                        <button type="submit" class="link-button">Delete my review</button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <h3>Write a review</h3>
+                    <p class="empty"><a href="{{ url_for('login') }}">Log in</a> or <a href="{{ url_for('signup') }}">sign up</a> to rate and review.</p>
+                    {% endif %}
+                </div>
+
+                <div class="review-list">
+                    {% for review in reviews %}
+                    <article class="review" id="review-{{ review.id }}">
+                        <p class="review-by">
+                            <strong>{{ review.name }}</strong>
+                            <span class="stars" aria-label="{{ review.rating }} out of 5 stars">{{ review.rating | stars }}</span>
+                            <span>{{ review.created_at | date }}</span>
+                        </p>
+                        <p class="review-text">{{ review.body }}</p>
+                        <form action="{{ url_for('react', review_id=review.id) }}" method="post" class="reactions">
+                            <button type="submit" name="value" value="like" aria-pressed="{{ 'true' if review.my_reaction == 1 else 'false' }}"
+                                aria-label="Like, {{ review.likes }} so far">Like · {{ review.likes }}</button>
+                            <button type="submit" name="value" value="dislike" aria-pressed="{{ 'true' if review.my_reaction == -1 else 'false' }}"
+                                aria-label="Dislike, {{ review.dislikes }} so far">Dislike · {{ review.dislikes }}</button>
+                        </form>
+                    </article>
+                    {% else %}
+                    <p class="empty">No written reviews yet. Be the first.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>© 2026 Critique</p>
+        </footer>
+    </main>
+{% endblock %}

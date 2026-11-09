@@ -1,0 +1,17 @@
+{% macro poster(item, cls="") -%}
+    <div class="poster {{ cls }}" style="--c1: {{ item.color1 }}; --c2: {{ item.color2 }};">
+        <span>{{ item.title }}</span>
+    </div>
+{%- endmacro %}
+
+{# Poster, title, creator and rating, linking to the item page. `rank` numbers the card via CSS. #}
+{% macro card(item, rank=False) -%}
+    <article class="card{{ ' ranked' if rank }}">
+        <a href="{{ item_url(item) }}">
+            {{ poster(item, "square" if item.type == "music") }}
+            <h3>{{ item.title }}</h3>
+        </a>
+        <p class="card-meta">{{ item.creator }}, {{ item.year }}</p>
+        <p class="rating"><span class="stars">★</span> {{ item.rating }}</p>
+    </article>
+{%- endmacro %}

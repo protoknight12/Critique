@@ -13,14 +13,15 @@ For now the user wants **basic functionality with placeholders ready for DB inte
 Don't wire in Postgres until asked.
 
 ## How it's built
-- `app.py`: routes (`/`, `/signup`, `/login`, `POST /logout`) and Jinja filters (`compact` 142000→142K, `stars` 4.6→★★★★★). Global `TYPE_LABELS`.
+- `app.py`: routes `/`, `/signup`, `/login`, `POST /logout`; `/movies` `/books` `/music` (browse, `?sort=rating|year|title`) and `/<section>/<id>` (item page with reviews at the bottom); `POST /items/<id>/bookmark`, `/bookmarks`; `POST /items/<id>/review`, `/reviews/<id>/delete`, `/reviews/<id>/react` (value like|dislike, repeat toggles off). Write routes use `@login_required` (redirects to login) and forms redirect via `safe_next`. Jinja filters `compact`, `stars`, `date`; global `item_url()`. Session cookie is SameSite=Lax (no CSRF tokens yet).
 - `db.py`: the **only** place data comes from. Functions return dicts shaped like the PostgreSQL rows
   (column names from `schema.sql`); each has a `TODO(db)` comment with its query. DB integration = rewrite these bodies.
   Users are stored in an in-memory list for now.
 - `schema.sql`: planned tables `users` (email unique case-insensitive), `items` (`type` movie/book/music, creator,
+  Also `bookmarks` (user, item) and `review_reactions` (review, user, value 1/-1). In memory, item ratings = seed baseline blended with user reviews.
   year, genre, description, color1/color2 poster gradient, featured), `reviews` (1–5 rating + optional body,
   one per user per item). Ratings/averages are computed from `reviews`, never stored.
-- `templates/`: `base.html` (head + body block), `index.html` (home), `signup.html`, `login.html`. Jinja autoescapes all data.
+- `templates/`: `base.html`, `_nav.html` (shared header), `_macros.html` (`poster`, `card`), `index.html`, `browse.html`, `item.html`, `bookmarks.html`, `signup.html`, `login.html`. Jinja autoescapes all data.
 - Passwords: Werkzeug `generate_password_hash` / `check_password_hash` in `app.py`; `db.py` only stores the hash.
 - Auth: Flask signed-cookie session, `session["user"] = {id, name}` set by `log_in()` (clears session first).
   Signup logs you in. `POST /logout`. Header shows name + Log out when logged in.
@@ -48,7 +49,8 @@ no avatar circles, no coloured dot after the logo, no em-dash marketing copy.
 - PostgreSQL 18 is installed on the user's machine (`C:\Program Files\PostgreSQL\18`, localhost:5432, password auth) but not used yet.
 
 ## Status / TODO
-- [ ] Write-a-review, item detail pages, "See all" pages, search, watchlist (buttons exist, link to `#`).
+- [x] Item pages, review form + delete, bookmarks, like/dislike on reviews, browse pages. (Test suite extended but NOT yet run: no Python on the dev machine PATH.)
+- [ ] Search, "See all" for latest reviews, recommendations of any kind.
 - [ ] Recommendations: nothing implemented yet.
 - [ ] Connect PostgreSQL: `psycopg`, run `schema.sql`, implement the `TODO(db)`s in `db.py`.
 - [ ] Real cover images (posters are gradient + title for now).

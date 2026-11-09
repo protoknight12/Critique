@@ -2,45 +2,10 @@
 
 {% block title %}Movies, Books &amp; Music Reviews{% endblock %}
 
-{% macro poster(item, cls="") -%}
-    <div class="poster {{ cls }}" style="--c1: {{ item.color1 }}; --c2: {{ item.color2 }};">
-        <span>{{ item.title }}</span>
-    </div>
-{%- endmacro %}
+{% from "_macros.html" import poster, card %}
 
 {% block body %}
-    <header class="navbar">
-        <a href="{{ url_for('index') }}" class="logo">Critique</a>
-
-        <nav class="nav-links">
-            <a href="#movies">Movies</a>
-            <a href="#books">Books</a>
-            <a href="#music">Music</a>
-            <a href="#reviews">Reviews</a>
-        </nav>
-
-        <form class="search" action="#" role="search">
-            <label for="search" class="sr-only">Search</label>
-            <input
-                type="search"
-                id="search"
-                name="q"
-                placeholder="Search titles, artists, authors"
-            >
-        </form>
-
-        <div class="nav-actions">
-            {% if session.user %}
-            <span class="nav-user">{{ session.user.name }}</span>
-            <form action="{{ url_for('logout') }}" method="post">
-                <button type="submit" class="nav-login">Log out</button>
-            </form>
-            {% else %}
-            <a href="{{ url_for('login') }}" class="nav-login">Log in</a>
-            <a href="{{ url_for('signup') }}" class="button small">Sign up</a>
-            {% endif %}
-        </div>
-    </header>
+    {% include "_nav.html" %}
 
     <main class="home">
         {% if featured %}
@@ -62,8 +27,8 @@
                 </div>
 
                 <div class="hero-actions">
-                    <a href="#" class="button">Write a review</a>
-                    <a href="#" class="button ghost">Add to watchlist</a>
+                    <a href="{{ item_url(featured, '#write-review') }}" class="button">Write a review</a>
+                    <a href="{{ item_url(featured) }}" class="button ghost">View details</a>
                 </div>
             </div>
         </section>
@@ -73,17 +38,10 @@
         <section class="row" id="{{ id }}">
             <div class="row-head">
                 <h2>{{ heading }}</h2>
-                <a href="#">See all</a>
+                <a href="{{ url_for('browse', section=id) }}">See all</a>
             </div>
             <div class="cards">
-                {% for item in items %}
-                <article class="card">
-                    {{ poster(item, "square" if item.type == "music") }}
-                    <h3>{{ item.title }}</h3>
-                    <p class="card-meta">{{ item.creator }}, {{ item.year }}</p>
-                    <p class="rating"><span class="stars">★</span> {{ item.rating }}</p>
-                </article>
-                {% endfor %}
+                {% for item in items %}{{ card(item, rank=True) }}{% endfor %}
             </div>
         </section>
         {% endfor %}
@@ -91,14 +49,13 @@
         <section class="row" id="reviews">
             <div class="row-head">
                 <h2>Latest Reviews</h2>
-                <a href="#">See all</a>
             </div>
             <div class="reviews">
                 {% for review in reviews %}
                 <article>
                     <p class="review-body">“{{ review.body }}”</p>
                     <p class="review-by">
-                        <strong>{{ review.name }}</strong> on <em>{{ review.title }}</em> ({{ TYPE_LABELS[review.type] | lower }})
+                        <strong>{{ review.name }}</strong> on <a href="{{ item_url({'type': review.type, 'id': review.item_id}, '#review-' ~ review.id) }}"><em>{{ review.title }}</em></a> ({{ TYPE_LABELS[review.type] | lower }})
                         <span class="stars" aria-label="{{ review.rating }} out of 5 stars">{{ review.rating | stars }}</span>
                     </p>
                 </article>

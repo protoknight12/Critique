@@ -326,7 +326,7 @@ h2 {
     margin-bottom: 2px;
 }
 
-.card h3::before {
+.card.ranked h3::before {
     counter-increment: rank;
     content: counter(rank) ". ";
     color: var(--muted);
@@ -532,5 +532,204 @@ footer {
 
     .auth-card {
         padding: 26px 20px;
+    }
+}
+
+/* ---------- Item, browse and bookmarks pages ---------- */
+
+.card > a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.card > a:hover h3 {
+    color: var(--accent);
+}
+
+.review-by a {
+    color: var(--ink);
+}
+
+.page-title {
+    font-size: 28px;
+}
+
+.sorts {
+    display: flex;
+    gap: 18px;
+    font-size: 14px;
+}
+
+.sorts a {
+    color: var(--muted);
+    text-decoration: none;
+}
+
+.sorts a[aria-current] {
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.empty {
+    color: var(--muted);
+}
+
+.empty a {
+    color: var(--ink);
+}
+
+.hero-actions form {
+    display: flex;
+}
+
+.hero-poster.square {
+    align-self: start;
+}
+
+.count {
+    color: var(--muted);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+}
+
+.review-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 48px;
+    align-items: start;
+}
+
+.review-form h3 {
+    margin-bottom: 14px;
+    font-size: 18px;
+}
+
+.review-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--field-border);
+    border-radius: 3px;
+    color: var(--ink);
+    font: inherit;
+    resize: vertical;
+}
+
+.review-form textarea:focus {
+    outline: 2px solid var(--ink);
+    outline-offset: -1px;
+}
+
+.review-form textarea::placeholder {
+    color: var(--placeholder);
+}
+
+.review-form label .optional {
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.rating-input {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding: 0;
+    border: 0;
+}
+
+.rating-input legend {
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.rating-input label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.rating-input input {
+    accent-color: var(--ink);
+}
+
+.inline-form {
+    margin-top: 12px;
+}
+
+.link-button {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-button:hover {
+    color: var(--error-text);
+}
+
+.review {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+    scroll-margin-top: 16px;
+}
+
+.review:first-child {
+    padding-top: 0;
+}
+
+.review-text {
+    margin-top: 8px;
+    max-width: 640px;
+    font-family: var(--serif);
+    font-size: 17px;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.review-by span + span::before {
+    content: "· ";
+}
+
+.reactions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.reactions button {
+    padding: 4px 12px;
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.reactions button:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+}
+
+.reactions button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+}
+
+@media (max-width: 900px) {
+    .review-layout {
+        grid-template-columns: 1fr;
+        gap: 32px;
     }
 }

@@ -1,0 +1,28 @@
+<header class="navbar">
+    <a href="{{ url_for('index') }}" class="logo">Critique</a>
+
+    <nav class="nav-links">
+        <a href="{{ url_for('browse', section='movies') }}">Movies</a>
+        <a href="{{ url_for('browse', section='books') }}">Books</a>
+        <a href="{{ url_for('browse', section='music') }}">Music</a>
+        <a href="{{ url_for('index') }}#reviews">Reviews</a>
+        {% if session.user %}<a href="{{ url_for('bookmarks') }}">Bookmarks</a>{% endif %}
+    </nav>
+
+    <form class="search" action="#" role="search">
+        <label for="search" class="sr-only">Search</label>
+        <input type="search" id="search" name="q" placeholder="Search titles, artists, authors">
+    </form>
+
+    <div class="nav-actions">
+        {% if session.user %}
+        <span class="nav-user">{{ session.user.name }}</span>
+        <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit" class="nav-login">Log out</button>
+        </form>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="nav-login">Log in</a>
+        <a href="{{ url_for('signup') }}" class="button small">Sign up</a>
+        {% endif %}
+    </div>
+</header>

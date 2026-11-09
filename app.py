@@ -2,7 +2,9 @@
 import os
 import secrets
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from functools import wraps
+
+from flask import Flask, abort, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
@@ -10,7 +12,14 @@ import db
 app = Flask(__name__)
 # ponytail: random fallback logs everyone out on restart; set SECRET_KEY in production.
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # blocks cross-site POSTs (CSRF) on the cookie-authenticated forms
 app.jinja_env.globals["TYPE_LABELS"] = {"movie": "Movie", "book": "Book", "music": "Album"}
+# URL section <-> item type
+SECTIONS = {"movies": "movie", "books": "book", "music": "music"}
+SECTION_OF = {t: s for s, t in SECTIONS.items()}
+SECTION_TITLES = {"movies": "Movies", "books": "Books", "music": "Albums"}
+SORTS = {"rating": "Top rated", "year": "Newest", "title": "A to Z"}
+MAX_REVIEW_LENGTH = 5000
 
 
 @app.template_filter()
@@ -28,6 +37,11 @@ def stars(rating):
     return "★" * full + "☆" * (5 - full)
 
 
+@app.template_filter()
+def date(value):
+    return value.strftime("%b %d, %Y").replace(" 0", " ")
+
+
 @app.route("/")
 def index():
     return render_template(
@@ -40,6 +54,105 @@ def index():
         ],
         reviews=db.get_latest_reviews(),
     )
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def item_url(item, anchor=""):
+    return url_for("item_page", section=SECTION_OF[item["type"]], item_id=item["id"]) + anchor
+
+
+app.jinja_env.globals["item_url"] = item_url
+
+
+def safe_next(default):
+    """Redirect target from the form's `next` field; only same-site paths are allowed."""
+    target = request.form.get("next", "")
+    ok = target.startswith("/") and not target.startswith("//") and "\\" not in target
+    return target if ok else default
+
+
+@app.route("/<any(movies,books,music):section>")
+def browse(section):
+    sort = request.args.get("sort", "rating")
+    if sort not in SORTS:
+        sort = "rating"
+    return render_template(
+        "browse.html", section=section, heading=SECTION_TITLES[section], sort=sort, sorts=SORTS,
+        items=db.list_items(SECTIONS[section], sort),
+    )
+
+
+@app.route("/<any(movies,books,music):section>/<int:item_id>")
+def item_page(section, item_id):
+    item = db.get_item(item_id)
+    if not item or SECTION_OF[item["type"]] != section:
+        abort(404)
+    user = session.get("user")
+    uid = user["id"] if user else None
+    return render_template(
+        "item.html", item=item, section=section,
+        reviews=db.get_item_reviews(item_id, uid),
+        my_review=db.get_user_review(uid, item_id) if uid else None,
+        bookmarked=db.is_bookmarked(uid, item_id) if uid else False,
+        max_length=MAX_REVIEW_LENGTH,
+    )
+
+
+@app.post("/items/<int:item_id>/bookmark")
+@login_required
+def bookmark(item_id):
+    item = db.get_item(item_id) or abort(404)
+    db.toggle_bookmark(session["user"]["id"], item_id)
+    return redirect(safe_next(item_url(item)))
+
+
+@app.route("/bookmarks")
+@login_required
+def bookmarks():
+    return render_template("bookmarks.html", items=db.get_bookmarks(session["user"]["id"]))
+
+
+@app.post("/items/<int:item_id>/review")
+@login_required
+def write_review(item_id):
+    item = db.get_item(item_id) or abort(404)
+    rating = request.form.get("rating", "")
+    body = request.form.get("body", "").strip()
+    if rating not in {"1", "2", "3", "4", "5"} or len(body) > MAX_REVIEW_LENGTH:
+        abort(400)
+    user = session["user"]
+    db.save_review(user["id"], user["name"], item_id, int(rating), body or None)
+    return redirect(item_url(item, "#reviews"))
+
+
+@app.post("/reviews/<int:review_id>/delete")
+@login_required
+def delete_review(review_id):
+    review = db.get_review(review_id) or abort(404)
+    if review["user_id"] != session["user"]["id"]:
+        abort(403)
+    item = db.get_item(review["item_id"])
+    db.delete_review(review_id)
+    return redirect(item_url(item, "#reviews"))
+
+
+@app.post("/reviews/<int:review_id>/react")
+@login_required
+def react(review_id):
+    review = db.get_review(review_id) or abort(404)
+    value = {"like": 1, "dislike": -1}.get(request.form.get("value"))
+    if value is None:
+        abort(400)
+    db.react_to_review(review_id, session["user"]["id"], value)
+    return redirect(item_url(db.get_item(review["item_id"]), f"#review-{review_id}"))
 
 
 def validate_signup(name, email, password):

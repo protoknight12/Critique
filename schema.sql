@@ -39,3 +39,19 @@ CREATE TABLE reviews (
 
 CREATE INDEX idx_items_type ON items(type);
 CREATE INDEX idx_reviews_item ON reviews(item_id);
+
+-- Items a user saved to come back to.
+CREATE TABLE bookmarks (
+    user_id    integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id    integer NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, item_id)
+);
+
+-- Like (1) or dislike (-1) on a review; one per user per review.
+CREATE TABLE review_reactions (
+    review_id integer NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+    user_id   integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    value     smallint NOT NULL CHECK (value IN (1, -1)),
+    PRIMARY KEY (review_id, user_id)
+);
